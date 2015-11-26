@@ -1,24 +1,30 @@
 function net = cnnsetup(net, x, y)
     inputmaps = 1;
     mapsize = size(squeeze(x(:, :, 1)));
-
+    
     for l = 1 : numel(net.layers)   %  layer
+        %subsampling initialize
         if strcmp(net.layers{l}.type, 's')
             mapsize = mapsize / net.layers{l}.scale;
             assert(all(floor(mapsize)==mapsize), ['Layer ' num2str(l) ' size must be integer. Actual: ' num2str(mapsize)]);
+			net.layers{l}.inputmaps = inputmaps;
             for j = 1 : inputmaps
                 net.layers{l}.b{j} = 0;
             end
         end
+        %w initialize
         if strcmp(net.layers{l}.type, 'c')
             mapsize = mapsize - net.layers{l}.kernelsize + 1;
             fan_out = net.layers{l}.outputmaps * net.layers{l}.kernelsize ^ 2;
+			net.layers{l}.inputmaps = inputmaps;
             for j = 1 : net.layers{l}.outputmaps  %  output map
                 fan_in = inputmaps * net.layers{l}.kernelsize ^ 2;
                 for i = 1 : inputmaps  %  input map
                     net.layers{l}.k{i}{j} = (rand(net.layers{l}.kernelsize) - 0.5) * 2 * sqrt(6 / (fan_in + fan_out));
-                end
-                net.layers{l}.b{j} = 0;
+					net.layers{l}.vk{i}{j} = zeros(net.layers{l}.kernelsize);
+				end
+                net.layers{l}.b{j} = (rand(1,1) - 0.5) * 2 * sqrt(6 / (fan_in + fan_out));
+				net.layers{l}.vb{j} = 0;
             end
             inputmaps = net.layers{l}.outputmaps;
         end
@@ -27,9 +33,13 @@ function net = cnnsetup(net, x, y)
     % 'fvnum' is the number of output neurons at the last layer, the layer just before the output layer.
     % 'ffb' is the biases of the output neurons.
     % 'ffW' is the weights between the last layer and the output neurons. Note that the last layer is fully connected to the output layer, that's why the size of the weights is (onum * fvnum)
-    fvnum = prod(mapsize) * inputmaps;
+   
+	%%尾部单层感知机
+   fvnum = prod(mapsize) * inputmaps;
     onum = size(y, 1);
 
     net.ffb = zeros(onum, 1);
+	net.vffb = zeros(onum, 1);
     net.ffW = (rand(onum, fvnum) - 0.5) * 2 * sqrt(6 / (onum + fvnum));
+	net.vffW = zeros(onum, fvnum);
 end
